@@ -1,0 +1,287 @@
+PY CODE 
+
+"""
+AI VOICE-CONTROLLED HOME ASSISTANT
+
+Features:
+- Records voice using microphone
+- Offline speech recognition (fast)
+- Whisper speech recognition (accurate)
+- Device control via Arduino / ESP32
+- AI fallback using Ollama (ChatGPT-like)
+"""
+
+import sounddevice as sd
+import soundfile as sf
+import numpy as np
+import pyttsx3
+import speech_recognition as sr
+import serial
+import time
+import requests
+from faster_whisper import WhisperModel
+from scipy.io.wavfile import write
+
+# ================= CONFIGURATION =================
+ARDUINO_PORT = "COM3"
+ARDUINO_BAUD = 9600
+
+WHISPER_MODEL_NAME = "tiny.en"
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "YOUR MODEL"
+
+LISTEN_DURATION = 4      # seconds
+FS = 16000               # sample rate
+
+# ================= INITIALIZATION =================
+arduino = serial.Serial(ARDUINO_PORT, ARDUINO_BAUD, timeout=1)
+time.sleep(2)
+arduino.reset_input_buffer()
+
+# Text-to-Speech engine
+engine = pyttsx3.init()
+engine.setProperty("rate", 150)
+engine.setProperty("volume", 1.0)
+
+# Whisper speech model
+whisper = WhisperModel(
+    WHISPER_MODEL_NAME,
+    device="cpu",
+    compute_type="int8",
+    cpu_threads=2
+)
+
+last_device_cmd = None  # prevents repeated relay triggers
+
+# ================= FUNCTIONS =================
+
+def speak(text):
+    """Convert text response into speech"""
+    print("Assistant:", text)
+    engine.say(text)
+    engine.runAndWait()
+
+def send_command_arduino(cmd):
+    """Send command string to Arduino via serial"""
+    global last_device_cmd
+
+    if cmd == last_device_cmd:
+        return  # avoid duplicate execution
+
+    last_device_cmd = cmd
+    arduino.write((cmd + "\n").encode())
+    time.sleep(0.15)
+
+    reply = arduino.readline().decode(errors="ignore").strip()
+    if reply:
+        speak(reply)
+
+def record_audio():
+    """Record microphone audio"""
+    print("\nListening...")
+    audio = sd.rec(
+        int(LISTEN_DURATION * FS),
+        samplerate=FS,
+        channels=1,
+        dtype="float32"
+    )
+    sd.wait()
+    sf.write("input.wav", audio, FS)
+    return audio.flatten()
+
+# ---------- FAST OFFLINE RECOGNITION ----------
+def offline_listen():
+    """Offline speech recognition (PocketSphinx)"""
+    r = sr.Recognizer()
+    try:
+        with sr.AudioFile("input.wav") as source:
+            audio = r.record(source)
+        return r.recognize_sphinx(audio).lower().strip()
+    except:
+        return ""
+
+# ---------- WHISPER RECOGNITION ----------
+def transcribe_whisper(audio):
+    """Accurate speech-to-text using Whisper"""
+    write("input.wav", FS, (audio * 32767).astype(np.int16))
+    segments, _ = whisper.transcribe("input.wav")
+    return " ".join(seg.text.lower().strip() for seg in segments)
+
+# ---------- DEVICE COMMAND PARSER ----------
+def parse_device_command(text):
+    """Match voice command to device control"""
+    DEVICE_COMMANDS = {
+        "light on": "LIGHT_ON",
+        "light off": "LIGHT_OFF",
+        "fan on": "FAN_ON",
+        "fan off": "FAN_OFF",
+        "tv on": "TV_ON",
+        "tv off": "TV_OFF",
+        "plug on": "PLUG_ON",
+        "plug off": "PLUG_OFF",
+        "turn on": "ALL_ON",
+        "turn off": "ALL_OFF"
+    }
+
+    text = text.lower().strip()
+
+    for phrase, cmd in DEVICE_COMMANDS.items():
+        if phrase in text:
+            send_command_arduino(cmd)
+            return True
+
+    return False  # send to AI
+
+# ---------- AI FALLBACK ----------
+def ask_ollama(text):
+    """Send question to AI model"""
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": text,
+                "stream": False
+            },
+            timeout=15
+        )
+        return r.json().get("response", "")
+    except:
+        return "AI is not responding"
+
+# ================= MAIN LOOP =================
+if __name__ == "__main__":
+    speak("System is ready")
+
+    try:
+        while True:
+            audio = record_audio()
+
+            # Step 1: Offline recognition
+            text = offline_listen()
+            if text:
+                print("You (offline):", text)
+                if parse_device_command(text):
+                    continue
+
+            # Step 2: Whisper recognition
+            text = transcribe_whisper(audio)
+            if not text:
+                continue
+
+            print("You:", text)
+
+            # Step 3: Device control
+            if parse_device_command(text):
+                continue
+
+            # Step 4: AI response
+            reply = ask_ollama(text)
+            speak(reply)
+
+    except KeyboardInterrupt:
+        print("Stopping...")
+    finally:
+        arduino.close()
+
+
+
+
+
+INO CODE 
+
+
+
+/*
+VOICE CONTROLLED HOME AUTOMATION
+Receives commands from Python via Serial
+Controls relays for home appliances
+*/
+
+#define RELAY1 7   // Light
+#define RELAY2 8   // Fan
+#define RELAY3 9   // TV
+#define RELAY4 10  // Plug
+
+String cmd = "";
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(RELAY1, OUTPUT);
+  pinMode(RELAY2, OUTPUT);
+  pinMode(RELAY3, OUTPUT);
+  pinMode(RELAY4, OUTPUT);
+
+  // Active LOW relays → OFF at startup
+  digitalWrite(RELAY1, HIGH);
+  digitalWrite(RELAY2, HIGH);
+  digitalWrite(RELAY3, HIGH);
+  digitalWrite(RELAY4, HIGH);
+
+  Serial.println("Arduino ready");
+}
+
+void loop() {
+  if (Serial.available()) {
+    cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+
+    // -------- LIGHT --------
+    if (cmd == "LIGHT_ON") {
+      digitalWrite(RELAY1, LOW);
+      Serial.println("Light ON");
+    }
+    else if (cmd == "LIGHT_OFF") {
+      digitalWrite(RELAY1, HIGH);
+      Serial.println("Light OFF");
+    }
+
+    // -------- FAN --------
+    else if (cmd == "FAN_ON") {
+      digitalWrite(RELAY2, LOW);
+      Serial.println("Fan ON");
+    }
+    else if (cmd == "FAN_OFF") {
+      digitalWrite(RELAY2, HIGH);
+      Serial.println("Fan OFF");
+    }
+
+    // -------- TV --------
+    else if (cmd == "TV_ON") {
+      digitalWrite(RELAY3, LOW);
+      Serial.println("TV ON");
+    }
+    else if (cmd == "TV_OFF") {
+      digitalWrite(RELAY3, HIGH);
+      Serial.println("TV OFF");
+    }
+
+    // -------- PLUG --------
+    else if (cmd == "PLUG_ON") {
+      digitalWrite(RELAY4, LOW);
+      Serial.println("Plug ON");
+    }
+    else if (cmd == "PLUG_OFF") {
+      digitalWrite(RELAY4, HIGH);
+      Serial.println("Plug OFF");
+    }
+
+    // -------- ALL DEVICES --------
+    else if (cmd == "ALL_ON") {
+      digitalWrite(RELAY1, LOW);
+      digitalWrite(RELAY2, LOW);
+      digitalWrite(RELAY3, LOW);
+      digitalWrite(RELAY4, LOW);
+      Serial.println("All ON");
+    }
+    else if (cmd == "ALL_OFF") {
+      digitalWrite(RELAY1, HIGH);
+      digitalWrite(RELAY2, HIGH);
+      digitalWrite(RELAY3, HIGH);
+      digitalWrite(RELAY4, HIGH);
+      Serial.println("All OFF");
+    }
+  }
+}
