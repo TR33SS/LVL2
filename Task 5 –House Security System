@@ -1,0 +1,219 @@
+PY CODE 
+
+"""
+FINAL SECURITY SYSTEM (IP CAMERA VERSION)
+
+How it works:
+- ESP32 detects motion using a PIR sensor
+- Motion status is sent to Blynk Virtual Pin V1
+- Python continuously checks Blynk cloud
+- When motion is detected:
+    - Mobile phone IP camera stream is activated
+    - OpenCV detects human presence
+    - Intruder image is captured
+    - Alert email is sent
+"""
+
+import cv2
+import time
+import requests
+import threading
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+
+# ----------------------- CONFIG -----------------------
+
+# Blynk authentication details
+BLYNK_TOKEN = "00lb5DmiuI"
+VIRTUAL_PIN = "V1"
+
+# Mobile phone IP camera stream URL
+STREAM_URL = "http://10.183.234.229:8080/video"
+
+# Email configuration
+SENDER_EMAIL = "@gmail.com"          # Sender Gmail
+APP_PASSWORD = "wah bhai wah"         # Gmail App Password
+RECEIVER_EMAIL = "@gmail.com"         # Receiver email
+
+# Time settings
+ACTIVE_SECONDS = 10       # Time to keep detection active
+COOLDOWN_SECONDS = 20     # Delay before next trigger
+
+# ----------------------------------------------------
+
+def check_motion_blynk():
+    """
+    Reads PIR motion status from Blynk Virtual Pin.
+    Returns True if motion detected.
+    """
+    try:
+        r = requests.get(
+            f"https://blynk.cloud/external/api/get?token={BLYNK_TOKEN}&{VIRTUAL_PIN}"
+        )
+        return r.text.strip() == "1"
+    except:
+        return False
+
+
+def reset_motion_blynk():
+    """
+    Resets PIR trigger value in Blynk after detection.
+    """
+    try:
+        requests.get(
+            f"https://blynk.cloud/external/api/update?token={BLYNK_TOKEN}&{VIRTUAL_PIN}=0"
+        )
+    except:
+        pass
+
+
+def send_email(image_path):
+    """
+    Sends captured intruder image as an email alert.
+    """
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = RECEIVER_EMAIL
+        msg["Subject"] = "⚠ Intruder Alert"
+
+        # Attach image
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(open(image_path, "rb").read())
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition", f"attachment; filename={image_path}"
+        )
+        msg.attach(part)
+
+        # Send email
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, APP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+
+        print("[INFO] Intruder image emailed successfully.")
+
+    except Exception as e:
+        print("[ERROR] Email failed:", e)
+
+
+def detection_loop():
+    """
+    Continuously reads IP camera stream and performs
+    human detection using OpenCV HOG detector.
+    """
+    print("[INFO] Connecting to IP Camera Stream:", STREAM_URL)
+
+    cap = cv2.VideoCapture(STREAM_URL)
+
+    if not cap.isOpened():
+        print("[ERROR] Cannot open IP stream!")
+        return
+
+    # OpenCV built-in human detector
+    hog = cv2.HOGDescriptor()
+    hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+
+    while True:
+        ret, frame = cap.read()
+
+        # Reconnect if stream fails
+        if not ret:
+            print("[WARNING] Stream lost. Reconnecting...")
+            cap.release()
+            time.sleep(1)
+            cap = cv2.VideoCapture(STREAM_URL)
+            continue
+
+        frame = cv2.resize(frame, (800, 600))
+
+        # Detection active only after PIR trigger
+        if active_event.is_set():
+            rects, _ = hog.detectMultiScale(frame, winStride=(8, 8))
+            person_detected = len(rects) > 0
+
+            # Draw bounding boxes
+            for (x, y, w, h) in rects:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+            cv2.imshow("Live Feed", frame)
+
+            # Capture and send email only once per event
+            if person_detected and not email_sent_event.is_set():
+                img_name = f"intruder_{int(time.time())}.jpg"
+                cv2.imwrite(img_name, frame)
+                threading.Thread(
+                    target=send_email,
+                    args=(img_name,),
+                    daemon=True
+                ).start()
+                email_sent_event.set()
+
+        else:
+            # Normal live feed display
+            cv2.putText(
+                frame, "Live Feed",
+                (10, 35),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 0, 255),
+                2
+            )
+            cv2.imshow("Live Feed", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+def controller_loop():
+    """
+    Controls system state based on PIR motion from Blynk.
+    """
+    last_trigger = 0
+
+    while True:
+        motion = check_motion_blynk()
+        now = time.time()
+
+        # PIR detected
+        if motion and (now - last_trigger) > COOLDOWN_SECONDS:
+            print("[INFO] Motion detected from PIR!")
+            active_event.set()
+            email_sent_event.clear()
+            reset_motion_blynk()
+            last_trigger = now
+
+        # Stop detection after active time
+        if active_event.is_set() and (now - last_trigger) > ACTIVE_SECONDS:
+            print("[INFO] Detection window closed.")
+            active_event.clear()
+            email_sent_event.clear()
+
+        time.sleep(0.8)
+
+
+# ----------------------- MAIN -----------------------
+if __name__ == "__main__":
+    active_event = threading.Event()
+    email_sent_event = threading.Event()
+
+    # Start camera detection thread
+    threading.Thread(target=detection_loop, daemon=True).start()
+
+    try:
+        controller_loop()
+    except KeyboardInterrupt:
+        print("System stopped.")
+
+
+
+
+
+INO CODE
