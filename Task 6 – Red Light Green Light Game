@@ -1,0 +1,140 @@
+import cv2
+import numpy as np
+import time
+
+"""
+RED LIGHT – GREEN LIGHT GAME (SQUID GAME)
+
+- Uses IP camera stream (ESP32-CAM / Mobile camera)
+- OpenCV detects motion using frame difference
+- Player can move only during GREEN light
+- Any movement during RED light causes elimination
+"""
+
+# -------------------------------------------------------------
+# IP Camera Stream URL
+# Example:
+# ESP32-CAM → http://192.168.x.x/stream
+# Mobile IP Webcam → http://.x.x:8080/video
+# -------------------------------------------------------------
+IP_URL = "http://5:8080/video"
+
+cap = cv2.VideoCapture(IP_URL)
+time.sleep(1)
+
+# Check if camera stream is working
+if not cap.isOpened():
+    print("❌ ERROR: Could not open IP stream!")
+    exit()
+
+print("Press 'q' to quit.")
+
+# ---------------- GAME SETTINGS ----------------
+green_light_duration = 5        # GREEN light time (seconds)
+red_light_duration = 5          # RED light time (seconds)
+motion_threshold = 50000        # Sensitivity for motion detection
+score_target = 100              # Score required to win
+progress_per_green = 20         # Score added per GREEN cycle
+eliminated_display_time = 2.5   # Display time after elimination
+
+# ---------------- GAME VARIABLES ----------------
+last_frame = None
+state = "GREEN"                 # Initial state
+state_change_time = time.time()
+is_eliminated = False
+score = 0
+
+# ---------------- MAIN GAME LOOP ----------------
+while True:
+    ret, frame = cap.read()
+
+    if not ret:
+        print("⚠ Stream lost… retrying…")
+        continue
+
+    # Resize for consistency
+    frame = cv2.resize(frame, (640, 480))
+
+    # Convert to grayscale and blur (for motion detection)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (21, 21), 0)
+
+    current_time = time.time()
+
+    # ---------- STATE CHANGE LOGIC ----------
+    if state == "GREEN" and current_time - state_change_time >= green_light_duration:
+        score += progress_per_green
+        state = "RED"
+        state_change_time = current_time
+        print("🔴 RED LIGHT!")
+
+    elif state == "RED" and current_time - state_change_time >= red_light_duration:
+        state = "GREEN"
+        state_change_time = current_time
+        print("🟢 GREEN LIGHT!")
+
+    # ---------- MOTION DETECTION (ONLY IN RED) ----------
+    if last_frame is not None:
+        frame_diff = cv2.absdiff(last_frame, gray)
+        thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)[1]
+        motion_score = np.sum(thresh)
+
+        # If motion detected during RED → eliminated
+        if state == "RED" and motion_score > motion_threshold and not is_eliminated:
+            is_eliminated = True
+            print("💀 Eliminated! You moved during RED LIGHT!")
+
+    # ---------- UI DRAWING ----------
+    top_bar_height = 60
+    frame[0:top_bar_height, :] = (50, 50, 50)
+
+    # Light indicator
+    if state == "GREEN":
+        cv2.rectangle(frame, (10, 10), (150, 50), (0, 255, 0), -1)
+        cv2.putText(frame, "GREEN", (25, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+    else:
+        cv2.rectangle(frame, (10, 10), (150, 50), (0, 0, 255), -1)
+        cv2.putText(frame, "RED", (55, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+    # Score bar
+    bar_x, bar_y = 170, 20
+    bar_width, bar_height = 300, 20
+    fill_width = int((score / score_target) * bar_width)
+
+    cv2.rectangle(frame, (bar_x, bar_y),
+                  (bar_x + bar_width, bar_y + bar_height),
+                  (255, 255, 255), 2)
+    cv2.rectangle(frame, (bar_x, bar_y),
+                  (bar_x + fill_width, bar_y + bar_height),
+                  (0, 255, 0), -1)
+
+    cv2.putText(frame, f"{score}/{score_target}",
+                (bar_x + bar_width + 10, bar_y + 17),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+    # ---------- WIN CONDITION ----------
+    if score >= score_target and not is_eliminated:
+        cv2.putText(frame, "WINNER!", (150, 250),
+                    cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 5)
+        cv2.imshow("Squid Game Camera", frame)
+        cv2.waitKey(3000)
+        break
+
+    # ---------- ELIMINATION CONDITION ----------
+    if is_eliminated:
+        cv2.putText(frame, "ELIMINATED!", (100, 250),
+                    cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 5)
+        cv2.imshow("Squid Game Camera", frame)
+        cv2.waitKey(int(eliminated_display_time * 1000))
+        break
+
+    cv2.imshow("Squid Game Camera", frame)
+    last_frame = gray
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
