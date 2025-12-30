@@ -1,0 +1,363 @@
+[
+    {
+        "id": "7ce63ee16dc048e9",
+        "type": "tab",
+        "label": "Flow 2",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "0534268d05ca244e",
+        "type": "mqtt in",
+        "z": "7ce63ee16dc048e9",
+        "name": "LDR Sensor",
+        "topic": "home/streetlight/ldr",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "e83ce758b5b2f7b5",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 160,
+        "wires": [
+            [
+                "17dba1bd87a848c4",
+                "a9ef60381e3ff34c"
+            ]
+        ]
+    },
+    {
+        "id": "16eb3cbfc7c5708f",
+        "type": "mqtt in",
+        "z": "7ce63ee16dc048e9",
+        "name": "PIR Sensor",
+        "topic": "home/streetlight/pir",
+        "qos": "2",
+        "datatype": "utf8",
+        "broker": "e83ce758b5b2f7b5",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 280,
+        "wires": [
+            [
+                "2bb0fe12b5f53634",
+                "8a76053175de72a8"
+            ]
+        ]
+    },
+    {
+        "id": "17dba1bd87a848c4",
+        "type": "ui-gauge",
+        "z": "7ce63ee16dc048e9",
+        "name": "",
+        "group": "31690f1006e77d19",
+        "order": 3,
+        "value": "payload.value",
+        "valueType": "msg",
+        "width": 12,
+        "height": 2,
+        "gtype": "gauge-half",
+        "gstyle": "needle",
+        "title": "INTENSITY",
+        "alwaysShowTitle": false,
+        "floatingTitlePosition": "top-left",
+        "units": "units",
+        "icon": "",
+        "prefix": "",
+        "suffix": "",
+        "segments": [
+            {
+                "from": "0",
+                "color": "#5cd65c",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "40",
+                "color": "#ffc800",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "70",
+                "color": "#ea5353",
+                "text": "",
+                "textType": "label"
+            }
+        ],
+        "min": 0,
+        "max": "100",
+        "sizeThickness": 16,
+        "sizeGap": 4,
+        "sizeKeyThickness": 8,
+        "styleRounded": true,
+        "styleGlow": false,
+        "className": "",
+        "x": 430,
+        "y": 160,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a9ef60381e3ff34c",
+        "type": "debug",
+        "z": "7ce63ee16dc048e9",
+        "name": "LDR Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 430,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "2bb0fe12b5f53634",
+        "type": "debug",
+        "z": "7ce63ee16dc048e9",
+        "name": "MOTION Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 440,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "f5a7f5e619a15768",
+        "type": "mqtt in",
+        "z": "7ce63ee16dc048e9",
+        "name": "Led",
+        "topic": "home/smartstreet/led",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "e83ce758b5b2f7b5",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 420,
+        "wires": [
+            [
+                "e32b06a1fa31ac78",
+                "ccc3049a176be72f"
+            ]
+        ]
+    },
+    {
+        "id": "8a76053175de72a8",
+        "type": "ui-text",
+        "z": "7ce63ee16dc048e9",
+        "group": "31690f1006e77d19",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "MOTION DETECTED : ",
+        "format": "{{msg.payload}}",
+        "layout": "row-center",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "x": 460,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "e32b06a1fa31ac78",
+        "type": "debug",
+        "z": "7ce63ee16dc048e9",
+        "name": "LED Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 430,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "ccc3049a176be72f",
+        "type": "ui-led",
+        "z": "7ce63ee16dc048e9",
+        "group": "31690f1006e77d19",
+        "order": 2,
+        "width": "1",
+        "height": "1",
+        "label": "",
+        "labelPlacement": "right",
+        "labelAlignment": "center",
+        "states": [
+            {
+                "value": "false",
+                "valueType": "bool",
+                "color": "#ff0000"
+            },
+            {
+                "value": "true",
+                "valueType": "bool",
+                "color": "#00ff00"
+            }
+        ],
+        "allowColorForValueInMessage": false,
+        "shape": "square",
+        "showBorder": false,
+        "showGlow": false,
+        "x": 410,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "e83ce758b5b2f7b5",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "test.mosquitto.org",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "31690f1006e77d19",
+        "type": "ui-group",
+        "name": "Group 1",
+        "page": "b589aaad3f8969aa",
+        "width": 3,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": true,
+        "disabled": false,
+        "groupType": "default"
+    },
+    {
+        "id": "b589aaad3f8969aa",
+        "type": "ui-page",
+        "name": "Page 1",
+        "ui": "cbef6fd21d374304",
+        "path": "/page1",
+        "icon": "home",
+        "layout": "grid",
+        "theme": "d2fa839e0b520246",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": 0,
+                "cols": 3
+            },
+            {
+                "name": "Tablet",
+                "px": 576,
+                "cols": 6
+            },
+            {
+                "name": "Small Desktop",
+                "px": 768,
+                "cols": 9
+            },
+            {
+                "name": "Desktop",
+                "px": 1024,
+                "cols": 12
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "cbef6fd21d374304",
+        "type": "ui-base",
+        "name": "My Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": true
+    },
+    {
+        "id": "d2fa839e0b520246",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#ffffff",
+            "primary": "#0094CE",
+            "bgPage": "#eeeeee",
+            "groupBg": "#ffffff",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "bc9632732f4139bf",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "@flowfuse/node-red-dashboard": "1.26.0",
+            "@flowfuse/node-red-dashboard-2-ui-led": "1.1.0"
+        }
+    }
+]
