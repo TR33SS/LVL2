@@ -26,11 +26,11 @@ from email import encoders
 # ----------------------- CONFIG -----------------------
 
 # Blynk authentication details
-BLYNK_TOKEN = "00lb5DmiuI"
+BLYNK_TOKEN = "IwONTgIVE"
 VIRTUAL_PIN = "V1"
 
 # Mobile phone IP camera stream URL
-STREAM_URL = "http://10.183.234.229:8080/video"
+STREAM_URL = "http://:8080/video"
 
 # Email configuration
 SENDER_EMAIL = "@gmail.com"          # Sender Gmail
@@ -217,3 +217,68 @@ if __name__ == "__main__":
 
 
 INO CODE
+
+
+
+
+/*********************************************************
+ * ESP32 PIR → Blynk Cloud
+ * Sends motion status to Virtual Pin V1
+ *********************************************************/
+
+#define BLYNK_PRINT Serial
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+
+// -------- BLYNK DETAILS --------
+#define BLYNK_AUTH_TOKEN "NAMASTE"
+#define BLYNK_TEMPLATE_ID "HELLO"      // optional
+#define BLYNK_TEMPLATE_NAME "HI"      // optional
+
+// -------- WIFI DETAILS --------
+char ssid[] = "YOUR_WIFI_NAME";
+char pass[] = "YOUR_WIFI_PASSWORD";
+
+// -------- PIR PIN --------
+#define PIR_PIN 27       // Change if needed
+#define VIRTUAL_PIN V1
+
+bool motionSent = false;
+
+void setup()
+{
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(PIR_PIN, INPUT);
+
+  Serial.println("Connecting to WiFi...");
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  Serial.println("ESP32 Security Node Ready");
+}
+
+void loop()
+{
+  Blynk.run();
+
+  int pirState = digitalRead(PIR_PIN);
+
+  // PIR detected
+  if (pirState == HIGH && !motionSent)
+  {
+    Serial.println("🚨 Motion Detected!");
+    Blynk.virtualWrite(VIRTUAL_PIN, 1);
+    motionSent = true;
+  }
+
+  // PIR idle
+  if (pirState == LOW)
+  {
+    motionSent = false;
+  }
+
+  delay(200);   // debounce + cloud safety
+}
