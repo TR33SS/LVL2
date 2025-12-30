@@ -1,0 +1,121 @@
+// ================= REQUIRED LIBRARIES =================
+// WiFi library for internet connection
+#include <WiFi.h>
+
+// MQTT library to communicate with Node-RED
+#include <PubSubClient.h>
+
+// ================= WIFI & MQTT CONFIGURATION =================
+const char* ssid = "PASS";
+const char* password = "WORD";
+const char* mqtt_server = "test.mosquitto.org";
+
+// Create WiFi and MQTT client objects
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// ================= PIN DEFINITIONS =================
+// LDR sensor connected to analog pin
+const int LDR_PIN = 34;
+
+// PIR motion sensor connected to digital pin
+const int PIR_PIN = 14;
+
+// LED simulates relay-controlled street light
+const int LED_PIN = 2;
+
+// Threshold to decide night condition
+#define NIGHT_THRESHOLD 30
+
+// ================= WIFI CONNECTION FUNCTION =================
+void setup_wifi() {
+  delay(10);
+  Serial.println("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+
+  // Wait until WiFi is connected
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi connected");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+
+// ================= MQTT RECONNECT FUNCTION =================
+void reconnect() {
+  // Keep trying until MQTT connects
+  while (!client.connected()) {
+    Serial.print("Connecting to MQTT...");
+    if (client.connect("ESP32ClientNodeRED")) {
+      Serial.println("Connected to MQTT Broker");
+    } else {
+      Serial.print("Failed, retrying...");
+      delay(5000);
+    }
+  }
+}
+
+// ================= SETUP FUNCTION =================
+void setup() {
+  Serial.begin(115200);
+
+  // Set sensor and actuator pins
+  pinMode(LDR_PIN, INPUT);
+  pinMode(PIR_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  // Connect to WiFi
+  setup_wifi();
+
+  // Configure MQTT broker
+  client.setServer(mqtt_server, 1883);
+}
+
+// ================= MAIN LOOP =================
+void loop() {
+  // Ensure MQTT connection
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
+  // Read LDR sensor value
+  int raw_ldr = analogRead(LDR_PIN);
+
+  // Map raw LDR value to percentage (0–100)
+  int ldr_value = map(raw_ldr, 0, 500, 0, 100);
+
+  // Read PIR motion sensor state
+  bool pir_state = digitalRead(PIR_PIN);
+
+  // Decide whether it is dark or bright
+  String status = (ldr_value < NIGHT_THRESHOLD) ? "Dark" : "Bright";
+
+  // Turn ON light only if it is dark AND motion is detected
+  bool led_state = (pir_state && (ldr_value < NIGHT_THRESHOLD));
+  digitalWrite(LED_PIN, led_state ? HIGH : LOW);
+
+  // Create MQTT payloads
+  String ldr_payload = "{\"value\": " + String(ldr_value) + 
+                       ", \"status\": \"" + status + "\"}";
+  String pir_payload = pir_state ? "true" : "false";
+  String led_payload = led_state ? "true" : "false";
+
+  // Publish data to Node-RED topics
+  client.publish("home/streetlight/ldr", ldr_payload.c_str());
+  client.publish("home/streetlight/pir", pir_payload.c_str());
+  client.publish("home/smartstreet/led", led_payload.c_str());
+
+  // Print status on Serial Monitor
+  Serial.printf("LDR: %d (%s), PIR: %s, LED: %s\n",
+                ldr_value, status.c_str(),
+                pir_state ? "True" : "False",
+                led_state ? "True" : "False");
+
+  Serial.println("-----------------------------------------");
+
+  delay(2000); // Update every 2 seconds
+}
