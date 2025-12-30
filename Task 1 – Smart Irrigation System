@@ -1,0 +1,57 @@
+// ================== SMART IRRIGATION SYSTEM ==================
+// This program automatically waters plants based on soil moisture
+// using a soil moisture sensor, relay module, and solenoid valve.
+
+// ------------------ Pin Definitions ------------------
+// Analog pin connected to soil moisture sensor output
+const int sensorPin = A0;
+
+// Digital pin connected to relay module input
+const int relayPin  = 7;
+
+// ------------------ Soil Moisture Threshold ------------------
+// Sensor gives values from 0 to 1023
+// Lower value  → Wet soil
+// Higher value → Dry soil
+// If value goes above this threshold, watering starts
+int threshold = 500;
+
+// ------------------ Setup Function ------------------
+void setup() {
+  // Set relay pin as OUTPUT because we control the relay
+  pinMode(relayPin, OUTPUT);
+
+  // Keep relay OFF initially
+  // (Most relay modules are ACTIVE LOW)
+  digitalWrite(relayPin, HIGH);
+
+  // Start serial communication for monitoring values
+  Serial.begin(9600);
+}
+
+// ------------------ Main Loop ------------------
+void loop() {
+  // Read current soil moisture value from sensor
+  int sensorValue = analogRead(sensorPin);
+
+  // Display soil moisture value on Serial Monitor
+  Serial.print("Soil Moisture: ");
+  Serial.println(sensorValue);
+
+  // Check if soil is dry
+  if (sensorValue > threshold) {
+    // Soil is dry → turn ON relay
+    // Relay ON opens solenoid valve and allows water flow
+    digitalWrite(relayPin, LOW);   // ACTIVE LOW relay
+    Serial.println("Soil Dry - Pump ON");
+  } 
+  else {
+    // Soil is wet → turn OFF relay
+    // Relay OFF closes solenoid valve and stops water flow
+    digitalWrite(relayPin, HIGH);
+    Serial.println("Soil Wet - Pump OFF");
+  }
+
+  // Delay to avoid rapid switching and allow stable readings
+  delay(1000);  // 1 second delay
+}
